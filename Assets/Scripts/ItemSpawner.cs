@@ -20,6 +20,8 @@ public class ItemSpawner : MonoBehaviour
     [SerializeField] private int weightCommon = 6;
     [SerializeField] private int weightRare   = 3;
     [SerializeField] private int weightEpic   = 1;
+    [Header("Effects")]
+    [SerializeField] private GameObject collectParticlePrefab; 
 
     private Transform   playerTransform;
     private float       spawnTimer = 0f;
@@ -140,25 +142,30 @@ public class ItemSpawner : MonoBehaviour
     }
 
     private void SpawnAt(Collectible.ItemType type, Vector3 pos)
-    {
-        PrimitiveType prim = (type == Collectible.ItemType.Common)
-            ? PrimitiveType.Sphere : PrimitiveType.Cube;
+{
+    PrimitiveType prim = (type == Collectible.ItemType.Common)
+        ? PrimitiveType.Sphere : PrimitiveType.Cube;
 
-        GameObject obj = GameObject.CreatePrimitive(prim);
-        obj.name = $"Collectible_{type}";
-        obj.transform.position = pos;
+    GameObject obj = GameObject.CreatePrimitive(prim);
+    obj.name = $"Collectible_{type}";
+    obj.transform.position = pos;
 
-        // Make collider a trigger
-        obj.GetComponent<Collider>().isTrigger = true;
+    obj.GetComponent<Collider>().isTrigger = true;
 
-        // Add and configure Collectible
-        Collectible c = obj.AddComponent<Collectible>();
-        itemTypeField?.SetValue(c, type);
+    Collectible c = obj.AddComponent<Collectible>();
+    itemTypeField?.SetValue(c, type);
 
-        // Spawn animation: scale from 0 → normal
-        obj.transform.localScale = Vector3.zero;
-        StartCoroutine(ScaleIn(obj.transform, 0.35f));
-    }
+    SetPrivateField(c, "collectParticlePrefab", collectParticlePrefab);
+
+    obj.transform.localScale = Vector3.zero;
+    StartCoroutine(ScaleIn(obj.transform, 0.35f));
+}
+private void SetPrivateField(object obj, string fieldName, object value)
+{
+    var field = obj.GetType().GetField(fieldName,
+        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+    field?.SetValue(obj, value);
+}
 
     /// <summary>
     /// Animate item popping into existence.

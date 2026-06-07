@@ -149,6 +149,10 @@ public class Collectible : MonoBehaviour
         // Destroy this object
         Destroy(gameObject);
     }
+    public void SetParticlePrefab(GameObject prefab)
+{
+    collectParticlePrefab = prefab;
+}
 
     /// <summary>
     /// Creates a simple runtime particle system if no prefab is assigned.

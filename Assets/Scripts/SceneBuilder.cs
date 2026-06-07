@@ -20,6 +20,9 @@ public class SceneBuilder : MonoBehaviour
     [SerializeField] private int rareCount   = 1;
     [SerializeField] private int epicCount   = 0;
 
+    [Header("Effects")]
+[SerializeField] private GameObject collectParticlePrefab; // assign di Inspector
+
     // Materials (created at runtime)
     private Material groundMat;
     private Material wallMat;
@@ -293,14 +296,17 @@ public class SceneBuilder : MonoBehaviour
     // ── GameManager ───────────────────────────────────────────────────────────
 
     private void BuildGameManager()
-    {
-        GameObject gm = new GameObject("GameManager");
-        gm.AddComponent<GameManager>();
+{
+    GameObject gm = new GameObject("GameManager");
+    gm.AddComponent<GameManager>();
 
-        // Item spawner — keeps arena populated during play
-        GameObject spawnerObj = new GameObject("ItemSpawner");
-        ItemSpawner spawner = spawnerObj.AddComponent<ItemSpawner>();
-    }
+    // Item spawner — keeps arena populated during play
+    GameObject spawnerObj = new GameObject("ItemSpawner");
+    ItemSpawner spawner = spawnerObj.AddComponent<ItemSpawner>();
+
+    // ← Tambah ini: inject particle prefab ke ItemSpawner
+    SetPrivateField(spawner, "collectParticlePrefab", collectParticlePrefab);
+}
 
     // ── UI ────────────────────────────────────────────────────────────────────
 

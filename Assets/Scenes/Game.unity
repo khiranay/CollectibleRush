@@ -353,6 +353,7 @@ MonoBehaviour:
   commonCount: 3
   rareCount: 1
   epicCount: 0
+  collectParticlePrefab: {fileID: 6039849690460717347, guid: 7b01eb91f608c1843a88850ad9737c10, type: 3}
 --- !u!4 &1441024289
 Transform:
   m_ObjectHideFlags: 0
