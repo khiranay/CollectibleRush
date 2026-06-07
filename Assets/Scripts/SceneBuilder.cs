@@ -15,10 +15,10 @@ public class SceneBuilder : MonoBehaviour
     [SerializeField] private float arenaWidth  = 20f;
     [SerializeField] private float arenaHeight = 20f;
 
-    [Header("Collectibles")]
-    [SerializeField] private int commonCount = 6;
-    [SerializeField] private int rareCount   = 3;
-    [SerializeField] private int epicCount   = 1;
+    [Header("Collectibles - Initial spawn only (ItemSpawner refills during play)")]
+    [SerializeField] private int commonCount = 3;
+    [SerializeField] private int rareCount   = 1;
+    [SerializeField] private int epicCount   = 0;
 
     // Materials (created at runtime)
     private Material groundMat;
@@ -242,11 +242,7 @@ public class SceneBuilder : MonoBehaviour
         // Add PlayerController
         PlayerController pc = player.AddComponent<PlayerController>();
 
-        // Set ground layer mask — must cast to LayerMask struct, not raw int
-        var field = typeof(PlayerController).GetField("groundLayerMask",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-        LayerMask groundMask = LayerMask.GetMask("Default");
-        field?.SetValue(pc, groundMask);
+        // No LayerMask injection needed — PlayerController uses RaycastAll with tag filtering
 
         // Add directional arrow indicator (child cube pointing forward)
         GameObject arrow = GameObject.CreatePrimitive(PrimitiveType.Cube);
@@ -300,6 +296,10 @@ public class SceneBuilder : MonoBehaviour
     {
         GameObject gm = new GameObject("GameManager");
         gm.AddComponent<GameManager>();
+
+        // Item spawner — keeps arena populated during play
+        GameObject spawnerObj = new GameObject("ItemSpawner");
+        ItemSpawner spawner = spawnerObj.AddComponent<ItemSpawner>();
     }
 
     // ── UI ────────────────────────────────────────────────────────────────────
@@ -395,33 +395,62 @@ public class SceneBuilder : MonoBehaviour
         goHighScore.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         goHighScore.rectTransform.pivot     = new Vector2(0.5f, 0.5f);
 
-        // Restart Button
-        GameObject btnObj = new GameObject("RestartButton");
+        // ── PLAY AGAIN button (replay directly) ────────────────────────────
+        GameObject btnObj = new GameObject("PlayAgainButton");
         btnObj.transform.SetParent(goPanel.transform, false);
         RectTransform btnRT = btnObj.AddComponent<RectTransform>();
-        btnRT.anchorMin    = new Vector2(0.5f, 0.5f);
-        btnRT.anchorMax    = new Vector2(0.5f, 0.5f);
-        btnRT.pivot        = new Vector2(0.5f, 0.5f);
-        btnRT.anchoredPosition = new Vector2(0, -180);
-        btnRT.sizeDelta    = new Vector2(320, 90);
+        btnRT.anchorMin        = new Vector2(0.5f, 0.5f);
+        btnRT.anchorMax        = new Vector2(0.5f, 0.5f);
+        btnRT.pivot            = new Vector2(0.5f, 0.5f);
+        btnRT.anchoredPosition = new Vector2(0, -160);
+        btnRT.sizeDelta        = new Vector2(340, 90);
 
         Image btnImg = btnObj.AddComponent<Image>();
         btnImg.color = new Color(0.2f, 0.7f, 0.3f);
 
         Button btn = btnObj.AddComponent<Button>();
         ColorBlock cb = btn.colors;
+        cb.normalColor      = new Color(0.2f, 0.7f, 0.3f);
         cb.highlightedColor = new Color(0.3f, 0.9f, 0.4f);
         cb.pressedColor     = new Color(0.1f, 0.5f, 0.2f);
         btn.colors = cb;
 
         TMP_Text btnLabel = CreateTMPText(btnObj, "BtnLabel",
-            Vector2.zero, new Vector2(320, 90),
-            TextAnchor.MiddleCenter, 42, Color.white, "PLAY AGAIN");
+            Vector2.zero, new Vector2(340, 90),
+            TextAnchor.MiddleCenter, 42, Color.white, "▶  PLAY AGAIN");
         btnLabel.fontStyle = FontStyles.Bold;
         btnLabel.rectTransform.anchorMin = Vector2.zero;
         btnLabel.rectTransform.anchorMax = Vector2.one;
         btnLabel.rectTransform.offsetMin = Vector2.zero;
         btnLabel.rectTransform.offsetMax = Vector2.zero;
+
+        // ── MENU button (go back to home screen) ─────────────────────────────
+        GameObject menuBtnObj = new GameObject("MenuButton");
+        menuBtnObj.transform.SetParent(goPanel.transform, false);
+        RectTransform menuBtnRT = menuBtnObj.AddComponent<RectTransform>();
+        menuBtnRT.anchorMin        = new Vector2(0.5f, 0.5f);
+        menuBtnRT.anchorMax        = new Vector2(0.5f, 0.5f);
+        menuBtnRT.pivot            = new Vector2(0.5f, 0.5f);
+        menuBtnRT.anchoredPosition = new Vector2(0, -270);
+        menuBtnRT.sizeDelta        = new Vector2(340, 75);
+
+        Image menuBtnImg = menuBtnObj.AddComponent<Image>();
+        menuBtnImg.color = new Color(0.18f, 0.22f, 0.3f);
+
+        Button menuBtn = menuBtnObj.AddComponent<Button>();
+        ColorBlock menuCb = menuBtn.colors;
+        menuCb.normalColor      = new Color(0.18f, 0.22f, 0.3f);
+        menuCb.highlightedColor = new Color(0.25f, 0.32f, 0.45f);
+        menuCb.pressedColor     = new Color(0.1f,  0.13f, 0.18f);
+        menuBtn.colors = menuCb;
+
+        TMP_Text menuBtnLabel = CreateTMPText(menuBtnObj, "MenuBtnLabel",
+            Vector2.zero, new Vector2(340, 75),
+            TextAnchor.MiddleCenter, 36, new Color(0.8f, 0.85f, 1f), "🏠  MAIN MENU");
+        menuBtnLabel.rectTransform.anchorMin = Vector2.zero;
+        menuBtnLabel.rectTransform.anchorMax = Vector2.one;
+        menuBtnLabel.rectTransform.offsetMin = Vector2.zero;
+        menuBtnLabel.rectTransform.offsetMax = Vector2.zero;
 
         goPanel.SetActive(false);
 
@@ -439,6 +468,7 @@ public class SceneBuilder : MonoBehaviour
         SetPrivateField(uiMgr, "finalScoreText",       goScore);
         SetPrivateField(uiMgr, "finalHighScoreText",   goHighScore);
         SetPrivateField(uiMgr, "restartButton",        btn);
+        SetPrivateField(uiMgr, "menuButton",           menuBtn);
         SetPrivateField(uiMgr, "legendText",           legendText);
     }
 

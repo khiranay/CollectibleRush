@@ -26,7 +26,8 @@ public class UIManager : MonoBehaviour
     [SerializeField] private GameObject gameOverPanel;
     [SerializeField] private TMP_Text   finalScoreText;
     [SerializeField] private TMP_Text   finalHighScoreText;
-    [SerializeField] private Button     restartButton;
+    [SerializeField] private Button     restartButton;   // "Play Again"
+    [SerializeField] private Button     menuButton;      // "Main Menu"
 
     // ── Item Legend (optional HUD legend) ────────────────────────────────────
     [Header("Item Legend")]
@@ -54,9 +55,13 @@ public class UIManager : MonoBehaviour
         if (legendText != null)
             legendText.text = "🟡 Common +1   🔵 Rare +3   🔴 Epic +5";
 
-        // Restart button wiring
+        // "Play Again" → replay game directly
         if (restartButton != null)
-            restartButton.onClick.AddListener(() => GameManager.Instance?.RestartGame());
+            restartButton.onClick.AddListener(() => GameManager.Instance?.ReplayGame());
+
+        // "Main Menu" → go to home screen
+        if (menuButton != null)
+            menuButton.onClick.AddListener(() => GameManager.Instance?.RestartGame());
 
         // Initial values
         UpdateScore(0);

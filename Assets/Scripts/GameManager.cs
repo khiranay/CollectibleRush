@@ -129,10 +129,23 @@ public class GameManager : MonoBehaviour
         player?.StopMovement();
     }
 
+    /// <summary>
+    /// Goes back to the Home Screen (scene index 0).
+    /// Called by the "Play Again" / "Menu" button on game over.
+    /// </summary>
     public void RestartGame()
     {
-        UnityEngine.SceneManagement.SceneManager.LoadScene(
-            UnityEngine.SceneManagement.SceneManager.GetActiveScene().buildIndex);
+        // Return to Home Screen (index 0) so player sees menu again.
+        // MenuScene index 0, GameScene index 1.
+        UnityEngine.SceneManagement.SceneManager.LoadScene(0);
+    }
+
+    /// <summary>
+    /// Directly replay without going to menu.
+    /// </summary>
+    public void ReplayGame()
+    {
+        UnityEngine.SceneManagement.SceneManager.LoadScene(1);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -1,36 +1,36 @@
 using UnityEngine;
+#if ENABLE_INPUT_SYSTEM
+using UnityEngine.InputSystem;
+#endif
 
-/// <summary>
-/// Handles player movement via tap-to-move on Android touch input.
-/// Moves the player smoothly toward a target position on the XZ plane.
-/// </summary>
 public class PlayerController : MonoBehaviour
 {
-    [Header("Movement Settings")]
-    [SerializeField] private float moveSpeed = 5f;
-    [SerializeField] private float stoppingDistance = 0.15f;
+    [Header("Movement")]
+    [SerializeField] private float moveSpeed        = 12f;   // was 5 — faster
+    [SerializeField] private float stoppingDistance =  0.2f;
+    [SerializeField] private float rotateSpeed      = 900f;
 
-    [Header("Layer Settings")]
-    [SerializeField] private LayerMask groundLayerMask;
-
-    private Vector3 targetPosition;
-    private bool isMoving = false;
-    private Camera mainCamera;
+    private Vector3   targetPosition;
+    private bool      isMoving = false;
+    private Camera    mainCamera;
     private Rigidbody rb;
+    private float     lockedY;
+
+    // Reusable buffer — avoids alloc every click
+    private static readonly RaycastHit[] hitBuffer = new RaycastHit[16];
 
     private void Awake()
     {
-        mainCamera = Camera.main;
-        rb = GetComponent<Rigidbody>();
-
-        // Start target at current position
+        mainCamera     = Camera.main;
+        rb             = GetComponent<Rigidbody>();
         targetPosition = transform.position;
+        lockedY        = transform.position.y;
     }
 
     private void Update()
     {
-        HandleTouchInput();
-        HandleMouseInput(); // For editor testing
+        ReadInput();
+        RotateTowardsTarget();
     }
 
     private void FixedUpdate()
@@ -38,101 +38,109 @@ public class PlayerController : MonoBehaviour
         MoveTowardsTarget();
     }
 
-    /// <summary>
-    /// Reads Android touch input and casts a ray to the ground plane.
-    /// </summary>
-    private void HandleTouchInput()
-    {
-        if (Input.touchCount > 0)
-        {
-            Touch touch = Input.GetTouch(0);
+    // ── Input ─────────────────────────────────────────────────────────────────
 
-            // Only on tap begin to avoid dragging weirdness
-            if (touch.phase == TouchPhase.Began)
+    private void ReadInput()
+    {
+#if ENABLE_INPUT_SYSTEM
+        var mouse = Mouse.current;
+        if (mouse != null && mouse.leftButton.wasPressedThisFrame)
+            { TrySetTarget(mouse.position.ReadValue()); return; }
+        var ts = Touchscreen.current;
+        if (ts != null && ts.primaryTouch.press.wasPressedThisFrame)
+            TrySetTarget(ts.primaryTouch.position.ReadValue());
+#else
+        if (Input.GetMouseButtonDown(0))
+            { TrySetTarget(Input.mousePosition); return; }
+        if (Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+            TrySetTarget(Input.GetTouch(0).position);
+#endif
+    }
+
+    // ── Raycast ───────────────────────────────────────────────────────────────
+
+    private void TrySetTarget(Vector2 screenPos)
+    {
+        Ray ray = mainCamera.ScreenPointToRay(screenPos);
+
+        // Non-alloc raycast — much cheaper than RaycastAll
+        int count = Physics.RaycastNonAlloc(ray, hitBuffer, 200f);
+
+        float   bestDist = float.MaxValue;
+        Vector3 bestPt   = Vector3.zero;
+        bool    found    = false;
+
+        for (int i = 0; i < count; i++)
+        {
+            var hit = hitBuffer[i];
+            if (hit.collider.gameObject == gameObject) continue;
+            if (hit.collider.isTrigger) continue;
+            if (hit.distance < bestDist)
             {
-                TrySetTargetFromScreenPoint(touch.position);
+                bestDist = hit.distance;
+                bestPt   = hit.point;
+                found    = true;
             }
         }
+
+        if (found)
+        {
+            SetTarget(new Vector3(bestPt.x, lockedY, bestPt.z));
+            return;
+        }
+
+        // Fallback: math intersect with Y=lockedY plane
+        Plane groundPlane = new Plane(Vector3.up, new Vector3(0, lockedY, 0));
+        if (groundPlane.Raycast(ray, out float dist))
+        {
+            Vector3 pt = ray.GetPoint(dist);
+            SetTarget(new Vector3(pt.x, lockedY, pt.z));
+        }
     }
 
-    /// <summary>
-    /// Mouse input fallback for Unity Editor testing.
-    /// Wrapped in try-catch in case the legacy Input module is disabled.
-    /// </summary>
-    private void HandleMouseInput()
+    private void SetTarget(Vector3 pos)
     {
-        try
-        {
-            if (Input.GetMouseButtonDown(0))
-            {
-                TrySetTargetFromScreenPoint(Input.mousePosition);
-            }
-        }
-        catch (System.InvalidOperationException)
-        {
-            // Legacy Input not available when new Input System package is active.
-            // Touch input (HandleTouchInput) handles all device input in that case.
-        }
+        targetPosition = pos;
+        isMoving       = true;
     }
 
-    /// <summary>
-    /// Raycast from camera through screen point to find world position on ground.
-    /// </summary>
-    private void TrySetTargetFromScreenPoint(Vector2 screenPoint)
-    {
-        Ray ray = mainCamera.ScreenPointToRay(screenPoint);
+    // ── Movement ──────────────────────────────────────────────────────────────
 
-        // Try hitting the ground layer first
-        if (Physics.Raycast(ray, out RaycastHit hit, 100f, groundLayerMask))
-        {
-            SetTarget(hit.point);
-        }
-        else
-        {
-            // Fallback: intersect with Y=0 plane
-            Plane groundPlane = new Plane(Vector3.up, Vector3.zero);
-            if (groundPlane.Raycast(ray, out float distance))
-            {
-                SetTarget(ray.GetPoint(distance));
-            }
-        }
-    }
-
-    private void SetTarget(Vector3 worldPosition)
-    {
-        // Keep player on the same Y level
-        targetPosition = new Vector3(worldPosition.x, transform.position.y, worldPosition.z);
-        isMoving = true;
-    }
-
-    /// <summary>
-    /// Smoothly moves the player toward the target using Rigidbody for physics collisions.
-    /// </summary>
     private void MoveTowardsTarget()
     {
-        if (!isMoving) return;
+        // Hard-lock Y
+        Vector3 p = transform.position;
+        if (Mathf.Abs(p.y - lockedY) > 0.01f)
+            rb.MovePosition(new Vector3(p.x, lockedY, p.z));
 
-        Vector3 direction = targetPosition - transform.position;
-        direction.y = 0f;
-        float distance = direction.magnitude;
+        if (!isMoving) { rb.linearVelocity = Vector3.zero; return; }
 
-        if (distance <= stoppingDistance)
+        Vector3 dir = targetPosition - transform.position;
+        dir.y = 0f;
+
+        if (dir.magnitude <= stoppingDistance)
         {
             rb.linearVelocity = Vector3.zero;
             isMoving = false;
             return;
         }
 
-        Vector3 velocity = direction.normalized * moveSpeed;
-        velocity.y = rb.linearVelocity.y; // preserve gravity
-        rb.linearVelocity = velocity;
+        rb.linearVelocity = new Vector3(
+            dir.normalized.x * moveSpeed,
+            0f,
+            dir.normalized.z * moveSpeed);
+    }
 
-        // Rotate player to face movement direction
-        if (direction != Vector3.zero)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(direction);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.fixedDeltaTime * 10f);
-        }
+    private void RotateTowardsTarget()
+    {
+        if (!isMoving) return;
+        Vector3 dir = targetPosition - transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.01f) return;
+        transform.rotation = Quaternion.RotateTowards(
+            transform.rotation,
+            Quaternion.LookRotation(dir),
+            rotateSpeed * Time.deltaTime);
     }
 
     public void StopMovement()

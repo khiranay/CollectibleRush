@@ -58,8 +58,8 @@ A simple Android top-down collecting game built with **Unity 6.4.x LTS** using *
 1. Open **File → Build Settings**
 2. Select **Android** platform → click **Switch Platform**
 3. Click **Player Settings** and configure:
-   - **Company Name**: Your name
-   - **Product Name**: TopDownCollector
+   - **Company Name**: naiya
+   - **Product Name**: TopDownCollector Game
    - **Package Name**: `com.yourname.topdowncollector`
    - **Minimum API Level**: Android 7.0 (API 24) or higher
    - **Target API Level**: Automatic (highest installed)
@@ -126,8 +126,6 @@ If you want to recreate the scene from scratch:
 3. Attach `SceneBuilder.cs` to it
 4. Press Play — the script builds everything automatically
 
-That's it! No other manual setup needed.
-
 ---
 
 ## 📦 Technical Details
@@ -144,11 +142,7 @@ That's it! No other manual setup needed.
 
 ## 👤 Author
 
-**[Your Name]**  
+**Fakhirah Inayah**  
 Unity Developer Intern Candidate  
 Technical Test Submission — FXMedia
 
----
-
-*Submitted to: maynard@fxmweb.com | cc: sheila@fxmweb.com, anna@fxmweb.com, meuti@fxmweb.com*  
-*Subject: [Technical Test] Unity Game Dev Internship - [Your Name]*
