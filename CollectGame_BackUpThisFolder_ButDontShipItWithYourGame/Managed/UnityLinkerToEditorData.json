@@ -956,7 +956,19 @@
             "icon": null
           },
           {
+            "name": "CapsuleCollider",
+            "scenes": [],
+            "dependencyType": 0,
+            "icon": null
+          },
+          {
             "name": "Collider",
+            "scenes": [],
+            "dependencyType": 1,
+            "icon": null
+          },
+          {
+            "name": "MeshCollider",
             "scenes": [],
             "dependencyType": 0,
             "icon": null
@@ -969,6 +981,12 @@
           },
           {
             "name": "Rigidbody",
+            "scenes": [],
+            "dependencyType": 0,
+            "icon": null
+          },
+          {
+            "name": "SphereCollider",
             "scenes": [],
             "dependencyType": 0,
             "icon": null

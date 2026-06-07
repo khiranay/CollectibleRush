@@ -52,16 +52,15 @@ public class Collectible : MonoBehaviour
     }
 
     private void Update()
-    {
-        if (isCollected) return;
+{
+    if (isCollected) return;
 
-        // Bob up and down
-        float newY = startPosition.y + Mathf.Sin(Time.time * bobSpeed) * bobAmplitude;
-        transform.position = new Vector3(transform.position.x, newY, transform.position.z);
+    // ✅ Gunakan startPosition.x/z — tidak bisa di-drift oleh physics
+    float newY = startPosition.y + Mathf.Sin(Time.time * bobSpeed) * bobAmplitude;
+    transform.position = new Vector3(startPosition.x, newY, startPosition.z);
 
-        // Rotate
-        transform.Rotate(Vector3.up, rotateSpeed * Time.deltaTime, Space.World);
-    }
+    transform.Rotate(Vector3.up, rotateSpeed * Time.deltaTime, Space.World);
+}
 
     /// <summary>
     /// Applies color and scale based on item type using primitive materials.
@@ -109,6 +108,7 @@ public class Collectible : MonoBehaviour
 
     /// <summary>
     /// Returns the correct lit shader for the active render pipeline.
+    /// Handles cross-platform compatibility for Android/iOS.
     /// </summary>
     private static Shader GetLitShader()
     {
@@ -116,7 +116,7 @@ public class Collectible : MonoBehaviour
         if (s != null) return s;
         s = Shader.Find("Standard");
         if (s != null) return s;
-        return Shader.Find("Sprites/Default");
+        return Shader.Find("Mobile/Diffuse");
     }
 
     private void OnTriggerEnter(Collider other)

@@ -64,5 +64,6 @@ crashlytics-build.properties
 # Folders terlihat di project kamu
 CollectGame_BackUpThisFolder_ButDontShipItWithYourGame/
 GameDevTestCase_BurstDebugInformation_DoNotShip/
+Collectable Rush_BurstDebugInformation_DoNotShip
 .utmp/
 .vscode/

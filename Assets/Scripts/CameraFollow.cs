@@ -18,7 +18,6 @@ public class CameraFollow : MonoBehaviour
 
     private void Start()
     {
-        // Auto-find player if not assigned
         if (playerTransform == null)
         {
             GameObject player = GameObject.FindGameObjectWithTag("Player");
@@ -31,11 +30,12 @@ public class CameraFollow : MonoBehaviour
             return;
         }
 
-        // Calculate offset so camera sits above+behind the player at correct angle
+        // Compute offset purely from height + tilt settings — never from current
+        // camera world position (which may be wrong if SceneBuilder placed it elsewhere).
         float backDistance = height / Mathf.Tan(tiltAngle * Mathf.Deg2Rad);
         offset = new Vector3(0f, height, -backDistance);
 
-        // Snap to initial position
+        // Snap to correct position immediately (no lerp on first frame)
         transform.position = playerTransform.position + offset;
         transform.LookAt(playerTransform.position);
     }

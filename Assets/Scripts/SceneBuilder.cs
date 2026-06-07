@@ -2,12 +2,11 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 using System.Collections.Generic;
+using UnityEngine.InputSystem.UI;
 
 /// <summary>
-/// Procedurally builds the entire game scene at runtime:
-/// ground plane, boundary walls, obstacle walls, collectibles, player, camera.
-/// No external assets required — primitive shapes only.
-/// Attach to an empty GameObject named "SceneBuilder" in a blank scene.
+/// Procedurally builds the entire game scene at runtime.
+/// Android-safe: no OverlapSphere in Awake, no custom physics layers.
 /// </summary>
 public class SceneBuilder : MonoBehaviour
 {
@@ -15,213 +14,212 @@ public class SceneBuilder : MonoBehaviour
     [SerializeField] private float arenaWidth  = 20f;
     [SerializeField] private float arenaHeight = 20f;
 
-    [Header("Collectibles - Initial spawn only (ItemSpawner refills during play)")]
+    [Header("Collectibles - Initial spawn")]
     [SerializeField] private int commonCount = 3;
     [SerializeField] private int rareCount   = 1;
     [SerializeField] private int epicCount   = 0;
 
     [Header("Effects")]
-[SerializeField] private GameObject collectParticlePrefab; // assign di Inspector
+    [SerializeField] private GameObject collectParticlePrefab;
 
-    // Materials (created at runtime)
     private Material groundMat;
     private Material wallMat;
     private Material obstacleMat;
     private Material playerMat;
+
+    // Obstacle bounds stored for pure-math collision avoidance (no OverlapSphere in Awake)
+    private List<Bounds> obstacleBounds = new List<Bounds>();
 
     private void Awake()
     {
         CreateMaterials();
         BuildArena();
         BuildObstacles();
-        BuildCollectibles();
         BuildPlayer();
         BuildCamera();
+        BuildCollectibles();
         BuildLighting();
         BuildUI();
         BuildGameManager();
     }
 
-    // ── Materials ──────────────────────────────────────────────────────────────
+    // ── Materials ─────────────────────────────────────────────────────────────
 
     private void CreateMaterials()
     {
-        groundMat   = CreateMat(new Color(0.18f, 0.25f, 0.18f));   // Dark green
-        wallMat     = CreateMat(new Color(0.4f,  0.4f,  0.45f));   // Gray
-        obstacleMat = CreateMat(new Color(0.55f, 0.35f, 0.2f));    // Brown
-        playerMat   = CreateMat(new Color(0.2f,  0.8f,  0.4f));    // Bright green
+        groundMat   = CreateMat(new Color(0.18f, 0.25f, 0.18f));
+        wallMat     = CreateMat(new Color(0.4f,  0.4f,  0.45f));
+        obstacleMat = CreateMat(new Color(0.55f, 0.35f, 0.2f));
+        playerMat   = CreateMat(new Color(0.2f,  0.8f,  0.4f));
     }
 
-    private Material CreateMat(Color color, bool metallic = false)
+    private Material CreateMat(Color color)
     {
         Material mat = new Material(GetLitShader());
         mat.color = color;
-        if (metallic)
-        {
-            mat.SetFloat("_Metallic", 0.6f);
-            mat.SetFloat("_Smoothness", 0.8f);
-            mat.SetFloat("_Glossiness", 0.8f);
-        }
         return mat;
     }
 
-    /// <summary>
-    /// Returns the correct lit shader for the active render pipeline.
-    /// URP: "Universal Render Pipeline/Lit"
-    /// Built-in: "Standard"
-    /// Fallback: "Sprites/Default" (always available, flat color)
-    /// </summary>
     private static Shader GetLitShader()
     {
         Shader s = Shader.Find("Universal Render Pipeline/Lit");
         if (s != null) return s;
         s = Shader.Find("Standard");
         if (s != null) return s;
-        return Shader.Find("Sprites/Default");
+        return Shader.Find("Mobile/Diffuse");
     }
 
     // ── Arena ─────────────────────────────────────────────────────────────────
 
     private void BuildArena()
     {
-        // Ground plane
+        // Ground — name "Ground" so PlayerController raycast can detect it
         GameObject ground = GameObject.CreatePrimitive(PrimitiveType.Cube);
         ground.name = "Ground";
-        ground.transform.position = new Vector3(0, -0.5f, 0);
+        ground.transform.position   = new Vector3(0f, -0.5f, 0f);
         ground.transform.localScale = new Vector3(arenaWidth, 1f, arenaHeight);
         ground.GetComponent<Renderer>().material = groundMat;
-        // Keep ground on Default layer (layer 0) so raycast mask works
-        ground.layer = 0;
 
-        // Add grid texture look via tiled material (shader supports it)
-        // Boundary walls (4 sides)
-        float wallThick = 1f;
-        float wallHeight = 2f;
+        float wt = 1f;   // wall thickness
+        float wh = 2f;   // wall height
+        float hw = arenaWidth  / 2f;
+        float hh = arenaHeight / 2f;
+        float wy = wh / 2f - 0.5f;
 
-        CreateWall("Wall_North", new Vector3(0, wallHeight / 2f - 0.5f,  arenaHeight / 2f + wallThick / 2f),
-                   new Vector3(arenaWidth + wallThick * 2f, wallHeight, wallThick));
-        CreateWall("Wall_South", new Vector3(0, wallHeight / 2f - 0.5f, -arenaHeight / 2f - wallThick / 2f),
-                   new Vector3(arenaWidth + wallThick * 2f, wallHeight, wallThick));
-        CreateWall("Wall_East",  new Vector3( arenaWidth / 2f + wallThick / 2f, wallHeight / 2f - 0.5f, 0),
-                   new Vector3(wallThick, wallHeight, arenaHeight));
-        CreateWall("Wall_West",  new Vector3(-arenaWidth / 2f - wallThick / 2f, wallHeight / 2f - 0.5f, 0),
-                   new Vector3(wallThick, wallHeight, arenaHeight));
+        CreateWall("Wall_North", new Vector3(0,  wy,  hh + wt/2f), new Vector3(arenaWidth + wt*2f, wh, wt));
+        CreateWall("Wall_South", new Vector3(0,  wy, -hh - wt/2f), new Vector3(arenaWidth + wt*2f, wh, wt));
+        CreateWall("Wall_East",  new Vector3( hw + wt/2f, wy, 0),   new Vector3(wt, wh, arenaHeight));
+        CreateWall("Wall_West",  new Vector3(-hw - wt/2f, wy, 0),   new Vector3(wt, wh, arenaHeight));
     }
 
-    private void CreateWall(string name, Vector3 position, Vector3 scale)
+    private void CreateWall(string name, Vector3 pos, Vector3 scale)
     {
-        GameObject wall = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        wall.name = name;
-        wall.transform.position = position;
-        wall.transform.localScale = scale;
-        wall.GetComponent<Renderer>().material = wallMat;
+        GameObject w = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        w.name = name;
+        w.transform.position   = pos;
+        w.transform.localScale = scale;
+        w.GetComponent<Renderer>().material = wallMat;
+        // Layer 0 (Default) — do NOT assign custom layers at runtime.
+        // Custom layers must be pre-registered in Project Settings → Tags & Layers
+        // to work in Android builds. BoxCollider from CreatePrimitive handles collision.
     }
 
     // ── Obstacles ─────────────────────────────────────────────────────────────
 
     private void BuildObstacles()
     {
-        // Cross obstacle in center
-        CreateObstacle("Obstacle_Center_H", new Vector3(0, 0, 0),       new Vector3(6f, 1.5f, 1f));
-        CreateObstacle("Obstacle_Center_V", new Vector3(0, 0, 0),       new Vector3(1f, 1.5f, 6f));
+        obstacleBounds.Clear();
 
-        // Corner obstacles
-        CreateObstacle("Obstacle_NE", new Vector3( 6f, 0,  6f), new Vector3(2f, 2f, 2f));
-        CreateObstacle("Obstacle_NW", new Vector3(-6f, 0,  6f), new Vector3(2f, 2f, 2f));
-        CreateObstacle("Obstacle_SE", new Vector3( 6f, 0, -6f), new Vector3(2f, 2f, 2f));
-        CreateObstacle("Obstacle_SW", new Vector3(-6f, 0, -6f), new Vector3(2f, 2f, 2f));
+        // Center cross
+        CreateObstacle("Obstacle_Center_H", Vector3.zero, new Vector3(6f, 1.5f, 1f));
+        CreateObstacle("Obstacle_Center_V", Vector3.zero, new Vector3(1f, 1.5f, 6f));
 
-        // Long wall divider (creates corridors)
-        CreateObstacle("Obstacle_Divider_1", new Vector3( 3f, 0, -3f), new Vector3(1f, 1.5f, 4f));
-        CreateObstacle("Obstacle_Divider_2", new Vector3(-3f, 0,  3f), new Vector3(1f, 1.5f, 4f));
+        // Corner blocks
+        CreateObstacle("Obstacle_NE", new Vector3( 6f, 0f,  6f), new Vector3(2f, 2f, 2f));
+        CreateObstacle("Obstacle_NW", new Vector3(-6f, 0f,  6f), new Vector3(2f, 2f, 2f));
+        CreateObstacle("Obstacle_SE", new Vector3( 6f, 0f, -6f), new Vector3(2f, 2f, 2f));
+        CreateObstacle("Obstacle_SW", new Vector3(-6f, 0f, -6f), new Vector3(2f, 2f, 2f));
+
+        // Dividers
+        CreateObstacle("Obstacle_Divider_1", new Vector3( 3f, 0f, -3f), new Vector3(1f, 1.5f, 4f));
+        CreateObstacle("Obstacle_Divider_2", new Vector3(-3f, 0f,  3f), new Vector3(1f, 1.5f, 4f));
     }
 
     private void CreateObstacle(string name, Vector3 pos, Vector3 scale)
     {
+        float finalY = pos.y + scale.y / 2f - 0.5f;
+        Vector3 finalPos = new Vector3(pos.x, finalY, pos.z);
+
         GameObject obs = GameObject.CreatePrimitive(PrimitiveType.Cube);
         obs.name = name;
-        obs.transform.position = new Vector3(pos.x, pos.y + scale.y / 2f - 0.5f, pos.z);
+        obs.transform.position   = finalPos;
         obs.transform.localScale = scale;
         obs.GetComponent<Renderer>().material = obstacleMat;
-        // Layer 9 = "Obstacle" (set at runtime without needing Tags registered)
-        obs.layer = 9;
+
+        // Store XZ bounds for pure-math spawn validation (no OverlapSphere needed)
+        obstacleBounds.Add(new Bounds(
+            new Vector3(pos.x, 0f, pos.z),
+            new Vector3(scale.x, 10f, scale.z)));
     }
 
     // ── Collectibles ──────────────────────────────────────────────────────────
 
     private void BuildCollectibles()
     {
-        List<Vector3> usedPositions = new List<Vector3>();
-        float halfW = arenaWidth  / 2f - 1.5f;
-        float halfH = arenaHeight / 2f - 1.5f;
+        List<Vector3> used = new List<Vector3>();
+        float hw = arenaWidth  / 2f - 1.5f;
+        float hh = arenaHeight / 2f - 1.5f;
 
-        SpawnCollectibles(Collectible.ItemType.Common, commonCount, usedPositions, halfW, halfH);
-        SpawnCollectibles(Collectible.ItemType.Rare,   rareCount,   usedPositions, halfW, halfH);
-        SpawnCollectibles(Collectible.ItemType.Epic,   epicCount,   usedPositions, halfW, halfH);
+        SpawnGroup(Collectible.ItemType.Common, commonCount, used, hw, hh);
+        SpawnGroup(Collectible.ItemType.Rare,   rareCount,   used, hw, hh);
+        SpawnGroup(Collectible.ItemType.Epic,   epicCount,   used, hw, hh);
     }
 
-    private void SpawnCollectibles(Collectible.ItemType type, int count,
-                                   List<Vector3> used, float halfW, float halfH)
+    private void SpawnGroup(Collectible.ItemType type, int count,
+                            List<Vector3> used, float hw, float hh)
     {
-        int attempts = 0;
-        int spawned  = 0;
-
-        while (spawned < count && attempts < 200)
+        int spawned = 0, attempts = 0;
+        while (spawned < count && attempts < 300)
         {
             attempts++;
-            float x = Random.Range(-halfW, halfW);
-            float z = Random.Range(-halfH, halfH);
+            float x = Random.Range(-hw, hw);
+            float z = Random.Range(-hh, hh);
             Vector3 pos = new Vector3(x, 0.5f, z);
 
-            // Avoid placing inside obstacles or too close to other items
-            if (IsClearPosition(pos, used))
+            if (IsClearMath(pos, used))
             {
-                SpawnCollectible(type, pos);
+                DoSpawnCollectible(type, pos);
                 used.Add(pos);
                 spawned++;
             }
         }
     }
 
-    private bool IsClearPosition(Vector3 pos, List<Vector3> used)
+    /// <summary>
+    /// Pure math bounds check — no Physics queries needed.
+    /// Works identically in Editor and Android IL2CPP builds.
+    /// </summary>
+    private bool IsClearMath(Vector3 pos, List<Vector3> used)
     {
-        // Check overlap with existing collectibles
+        // Too close to existing items
         foreach (var p in used)
-            if (Vector3.Distance(pos, p) < 2f) return false;
+            if (Vector2.Distance(new Vector2(pos.x, pos.z), new Vector2(p.x, p.z)) < 2f)
+                return false;
 
-        // Check overlap with obstacles via sphere cast (layer 9 = obstacle layer)
-        Collider[] hits = Physics.OverlapSphere(pos, 1.2f);
-        foreach (var h in hits)
-            if (h.gameObject.layer == 9) return false;
+        // Inside any obstacle (XZ only, with 1.0 margin)
+        foreach (var b in obstacleBounds)
+        {
+            if (Mathf.Abs(pos.x - b.center.x) < b.extents.x + 1.0f &&
+                Mathf.Abs(pos.z - b.center.z) < b.extents.z + 1.0f)
+                return false;
+        }
 
-        // Avoid center cross obstacle area
-        if (Mathf.Abs(pos.x) < 3.5f && Mathf.Abs(pos.z) < 3.5f) return false;
+        // Too close to arena boundary walls
+        float hw = arenaWidth  / 2f - 1.5f;
+        float hh = arenaHeight / 2f - 1.5f;
+        if (Mathf.Abs(pos.x) > hw || Mathf.Abs(pos.z) > hh) return false;
 
         return true;
     }
 
-    private void SpawnCollectible(Collectible.ItemType type, Vector3 pos)
+    private void DoSpawnCollectible(Collectible.ItemType type, Vector3 pos)
     {
-        // Common = Sphere, Rare = Cube, Epic = Cube (gem shape via script)
         PrimitiveType prim = (type == Collectible.ItemType.Common)
-            ? PrimitiveType.Sphere
-            : PrimitiveType.Cube;
+            ? PrimitiveType.Sphere : PrimitiveType.Cube;
 
         GameObject obj = GameObject.CreatePrimitive(prim);
         obj.name = $"Collectible_{type}";
         obj.transform.position = pos;
+        obj.GetComponent<Collider>().isTrigger = true;
 
-        // Replace box collider with trigger
-        Collider col = obj.GetComponent<Collider>();
-        col.isTrigger = true;
-
-        // Add Collectible script — it sets own color/scale
         Collectible c = obj.AddComponent<Collectible>();
 
-        // Inject type via reflection (field is private serialized)
         var field = typeof(Collectible).GetField("itemType",
             System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
         field?.SetValue(c, type);
+
+        if (collectParticlePrefab != null)
+            c.SetParticlePrefab(collectParticlePrefab);
     }
 
     // ── Player ────────────────────────────────────────────────────────────────
@@ -231,23 +229,20 @@ public class SceneBuilder : MonoBehaviour
         GameObject player = GameObject.CreatePrimitive(PrimitiveType.Capsule);
         player.name = "Player";
         player.tag  = "Player";
-        player.transform.position = new Vector3(-7f, 0.5f, -7f);
-
+        // Spawn in a corridor that is clear of all obstacles
+        player.transform.position = new Vector3(-4f, 0.5f, -4f);
         player.GetComponent<Renderer>().material = playerMat;
 
-        // Physics
         Rigidbody rb = player.AddComponent<Rigidbody>();
         rb.constraints = RigidbodyConstraints.FreezeRotationX |
                          RigidbodyConstraints.FreezeRotationZ |
                          RigidbodyConstraints.FreezePositionY;
+        // Continuous sweep prevents tunneling through walls on Android
+        rb.collisionDetectionMode = CollisionDetectionMode.Continuous;
 
-        // Collider already present (CapsuleCollider)
-        // Add PlayerController
-        PlayerController pc = player.AddComponent<PlayerController>();
+        player.AddComponent<PlayerController>();
 
-        // No LayerMask injection needed — PlayerController uses RaycastAll with tag filtering
-
-        // Add directional arrow indicator (child cube pointing forward)
+        // Direction arrow
         GameObject arrow = GameObject.CreatePrimitive(PrimitiveType.Cube);
         arrow.name = "Arrow";
         Destroy(arrow.GetComponent<Collider>());
@@ -271,24 +266,25 @@ public class SceneBuilder : MonoBehaviour
         }
 
         cam.backgroundColor = new Color(0.1f, 0.12f, 0.15f);
-        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.clearFlags      = CameraClearFlags.SolidColor;
 
-        CameraFollow cf = cam.gameObject.AddComponent<CameraFollow>();
+        // Do NOT set camera position here — CameraFollow.Start() computes
+        // the correct offset from the player's actual position.
+        if (cam.gameObject.GetComponent<CameraFollow>() == null)
+            cam.gameObject.AddComponent<CameraFollow>();
     }
 
     // ── Lighting ──────────────────────────────────────────────────────────────
 
     private void BuildLighting()
     {
-        // Directional light
         GameObject lightObj = new GameObject("Directional Light");
-        Light light = lightObj.AddComponent<Light>();
-        light.type      = LightType.Directional;
-        light.intensity = 1.2f;
-        light.color     = new Color(1f, 0.95f, 0.85f);
-        light.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
+        Light l = lightObj.AddComponent<Light>();
+        l.type      = LightType.Directional;
+        l.intensity = 1.2f;
+        l.color     = new Color(1f, 0.95f, 0.85f);
+        l.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
 
-        // Ambient light
         RenderSettings.ambientMode  = UnityEngine.Rendering.AmbientMode.Flat;
         RenderSettings.ambientLight = new Color(0.25f, 0.28f, 0.3f);
     }
@@ -296,31 +292,39 @@ public class SceneBuilder : MonoBehaviour
     // ── GameManager ───────────────────────────────────────────────────────────
 
     private void BuildGameManager()
-{
-    GameObject gm = new GameObject("GameManager");
-    gm.AddComponent<GameManager>();
+    {
+        GameObject gm = new GameObject("GameManager");
+        gm.AddComponent<GameManager>();
 
-    // Item spawner — keeps arena populated during play
-    GameObject spawnerObj = new GameObject("ItemSpawner");
-    ItemSpawner spawner = spawnerObj.AddComponent<ItemSpawner>();
+        GameObject spawnerObj = new GameObject("ItemSpawner");
+        ItemSpawner spawner = spawnerObj.AddComponent<ItemSpawner>();
 
-    // ← Tambah ini: inject particle prefab ke ItemSpawner
-    SetPrivateField(spawner, "collectParticlePrefab", collectParticlePrefab);
-}
+        // Pass obstacle bounds to spawner so it can also use pure-math checks
+        spawner.SetObstacleBounds(obstacleBounds);
+
+        SetPrivateField(spawner, "collectParticlePrefab", collectParticlePrefab);
+    }
 
     // ── UI ────────────────────────────────────────────────────────────────────
 
     private void BuildUI()
     {
-        // Canvas
+        if (FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
+    {
+        GameObject esObj = new GameObject("EventSystem");
+        esObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
+        // Ganti StandaloneInputModule → InputSystemUIInputModule
+        esObj.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
+    }
+
         GameObject canvasObj = new GameObject("Canvas");
         Canvas canvas = canvasObj.AddComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvasObj.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        canvasObj.GetComponent<CanvasScaler>().referenceResolution = new Vector2(1080, 1920);
+        CanvasScaler scaler = canvasObj.AddComponent<CanvasScaler>();
+        scaler.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1080, 1920);
         canvasObj.AddComponent<GraphicRaycaster>();
 
-        // Score text
         TMP_Text scoreText = CreateTMPText(canvasObj, "ScoreText",
             new Vector2(20, -30), new Vector2(400, 60),
             TextAnchor.UpperLeft, 40, Color.white, "Score: 0");
@@ -328,7 +332,6 @@ public class SceneBuilder : MonoBehaviour
         scoreText.rectTransform.anchorMax = new Vector2(0, 1);
         scoreText.rectTransform.pivot     = new Vector2(0, 1);
 
-        // Timer text
         TMP_Text timerText = CreateTMPText(canvasObj, "TimerText",
             new Vector2(-20, -30), new Vector2(300, 60),
             TextAnchor.UpperRight, 40, Color.white, "Time: 60");
@@ -336,7 +339,6 @@ public class SceneBuilder : MonoBehaviour
         timerText.rectTransform.anchorMax = new Vector2(1, 1);
         timerText.rectTransform.pivot     = new Vector2(1, 1);
 
-        // High score text
         TMP_Text highScoreText = CreateTMPText(canvasObj, "HighScoreText",
             new Vector2(0, -90), new Vector2(400, 50),
             TextAnchor.UpperCenter, 28, new Color(1f, 0.85f, 0.3f), "Best: 0");
@@ -344,7 +346,6 @@ public class SceneBuilder : MonoBehaviour
         highScoreText.rectTransform.anchorMax = new Vector2(0.5f, 1f);
         highScoreText.rectTransform.pivot     = new Vector2(0.5f, 1f);
 
-        // Legend text
         TMP_Text legendText = CreateTMPText(canvasObj, "LegendText",
             new Vector2(0, 20), new Vector2(700, 50),
             TextAnchor.LowerCenter, 22, new Color(0.9f, 0.9f, 0.9f, 0.7f), "");
@@ -352,7 +353,6 @@ public class SceneBuilder : MonoBehaviour
         legendText.rectTransform.anchorMax = new Vector2(0.5f, 0f);
         legendText.rectTransform.pivot     = new Vector2(0.5f, 0f);
 
-        // Collection popup (center screen)
         TMP_Text popupText = CreateTMPText(canvasObj, "PopupText",
             new Vector2(0, 80), new Vector2(300, 100),
             TextAnchor.MiddleCenter, 72, Color.yellow, "+1");
@@ -362,21 +362,17 @@ public class SceneBuilder : MonoBehaviour
         popupText.rectTransform.pivot     = new Vector2(0.5f, 0.5f);
         popupText.gameObject.SetActive(false);
 
-        // ── Game Over Panel ──────────────────────────────────────────────────
-
+        // Game Over Panel
         GameObject goPanel = new GameObject("GameOverPanel");
         goPanel.transform.SetParent(canvasObj.transform, false);
         RectTransform panelRT = goPanel.AddComponent<RectTransform>();
-        panelRT.anchorMin   = Vector2.zero;
-        panelRT.anchorMax   = Vector2.one;
-        panelRT.offsetMin   = Vector2.zero;
-        panelRT.offsetMax   = Vector2.zero;
-
-        // Semi-transparent background
+        panelRT.anchorMin = Vector2.zero;
+        panelRT.anchorMax = Vector2.one;
+        panelRT.offsetMin = Vector2.zero;
+        panelRT.offsetMax = Vector2.zero;
         Image panelBG = goPanel.AddComponent<Image>();
         panelBG.color = new Color(0f, 0f, 0f, 0.75f);
 
-        // "GAME OVER" title
         TMP_Text goTitle = CreateTMPText(goPanel, "GOTitle",
             new Vector2(0, 200), new Vector2(700, 120),
             TextAnchor.MiddleCenter, 80, Color.white, "GAME OVER");
@@ -385,7 +381,6 @@ public class SceneBuilder : MonoBehaviour
         goTitle.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         goTitle.rectTransform.pivot     = new Vector2(0.5f, 0.5f);
 
-        // Final score
         TMP_Text goScore = CreateTMPText(goPanel, "GOScore",
             new Vector2(0, 60), new Vector2(600, 90),
             TextAnchor.MiddleCenter, 56, new Color(1f, 0.85f, 0f), "Final Score\n0");
@@ -393,7 +388,6 @@ public class SceneBuilder : MonoBehaviour
         goScore.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         goScore.rectTransform.pivot     = new Vector2(0.5f, 0.5f);
 
-        // High score
         TMP_Text goHighScore = CreateTMPText(goPanel, "GOHighScore",
             new Vector2(0, -60), new Vector2(600, 70),
             TextAnchor.MiddleCenter, 40, new Color(0.9f, 0.7f, 0.2f), "Best: 0");
@@ -401,103 +395,71 @@ public class SceneBuilder : MonoBehaviour
         goHighScore.rectTransform.anchorMax = new Vector2(0.5f, 0.5f);
         goHighScore.rectTransform.pivot     = new Vector2(0.5f, 0.5f);
 
-        // ── PLAY AGAIN button (replay directly) ────────────────────────────
-        GameObject btnObj = new GameObject("PlayAgainButton");
-        btnObj.transform.SetParent(goPanel.transform, false);
-        RectTransform btnRT = btnObj.AddComponent<RectTransform>();
-        btnRT.anchorMin        = new Vector2(0.5f, 0.5f);
-        btnRT.anchorMax        = new Vector2(0.5f, 0.5f);
-        btnRT.pivot            = new Vector2(0.5f, 0.5f);
-        btnRT.anchoredPosition = new Vector2(0, -160);
-        btnRT.sizeDelta        = new Vector2(340, 90);
+        Button btn     = CreateButton(goPanel, "PlayAgainButton",
+            new Vector2(0, -160), new Vector2(340, 90),
+            new Color(0.2f, 0.7f, 0.3f), "▶  PLAY AGAIN", 42);
 
-        Image btnImg = btnObj.AddComponent<Image>();
-        btnImg.color = new Color(0.2f, 0.7f, 0.3f);
-
-        Button btn = btnObj.AddComponent<Button>();
-        ColorBlock cb = btn.colors;
-        cb.normalColor      = new Color(0.2f, 0.7f, 0.3f);
-        cb.highlightedColor = new Color(0.3f, 0.9f, 0.4f);
-        cb.pressedColor     = new Color(0.1f, 0.5f, 0.2f);
-        btn.colors = cb;
-
-        TMP_Text btnLabel = CreateTMPText(btnObj, "BtnLabel",
-            Vector2.zero, new Vector2(340, 90),
-            TextAnchor.MiddleCenter, 42, Color.white, "▶  PLAY AGAIN");
-        btnLabel.fontStyle = FontStyles.Bold;
-        btnLabel.rectTransform.anchorMin = Vector2.zero;
-        btnLabel.rectTransform.anchorMax = Vector2.one;
-        btnLabel.rectTransform.offsetMin = Vector2.zero;
-        btnLabel.rectTransform.offsetMax = Vector2.zero;
-
-        // ── MENU button (go back to home screen) ─────────────────────────────
-        GameObject menuBtnObj = new GameObject("MenuButton");
-        menuBtnObj.transform.SetParent(goPanel.transform, false);
-        RectTransform menuBtnRT = menuBtnObj.AddComponent<RectTransform>();
-        menuBtnRT.anchorMin        = new Vector2(0.5f, 0.5f);
-        menuBtnRT.anchorMax        = new Vector2(0.5f, 0.5f);
-        menuBtnRT.pivot            = new Vector2(0.5f, 0.5f);
-        menuBtnRT.anchoredPosition = new Vector2(0, -270);
-        menuBtnRT.sizeDelta        = new Vector2(340, 75);
-
-        Image menuBtnImg = menuBtnObj.AddComponent<Image>();
-        menuBtnImg.color = new Color(0.18f, 0.22f, 0.3f);
-
-        Button menuBtn = menuBtnObj.AddComponent<Button>();
-        ColorBlock menuCb = menuBtn.colors;
-        menuCb.normalColor      = new Color(0.18f, 0.22f, 0.3f);
-        menuCb.highlightedColor = new Color(0.25f, 0.32f, 0.45f);
-        menuCb.pressedColor     = new Color(0.1f,  0.13f, 0.18f);
-        menuBtn.colors = menuCb;
-
-        TMP_Text menuBtnLabel = CreateTMPText(menuBtnObj, "MenuBtnLabel",
-            Vector2.zero, new Vector2(340, 75),
-            TextAnchor.MiddleCenter, 36, new Color(0.8f, 0.85f, 1f), "🏠  MAIN MENU");
-        menuBtnLabel.rectTransform.anchorMin = Vector2.zero;
-        menuBtnLabel.rectTransform.anchorMax = Vector2.one;
-        menuBtnLabel.rectTransform.offsetMin = Vector2.zero;
-        menuBtnLabel.rectTransform.offsetMax = Vector2.zero;
+        Button menuBtn = CreateButton(goPanel, "MenuButton",
+            new Vector2(0, -270), new Vector2(340, 75),
+            new Color(0.18f, 0.22f, 0.3f), "🏠  MAIN MENU", 36);
 
         goPanel.SetActive(false);
 
-        // ── Wire UIManager ───────────────────────────────────────────────────
-
         GameObject uiMgrObj = new GameObject("UIManager");
         UIManager uiMgr = uiMgrObj.AddComponent<UIManager>();
-
-        // Inject references via reflection
-        SetPrivateField(uiMgr, "scoreText",            scoreText);
-        SetPrivateField(uiMgr, "timerText",            timerText);
-        SetPrivateField(uiMgr, "highScoreText",        highScoreText);
-        SetPrivateField(uiMgr, "collectionPopupText",  popupText);
-        SetPrivateField(uiMgr, "gameOverPanel",        goPanel);
-        SetPrivateField(uiMgr, "finalScoreText",       goScore);
-        SetPrivateField(uiMgr, "finalHighScoreText",   goHighScore);
-        SetPrivateField(uiMgr, "restartButton",        btn);
-        SetPrivateField(uiMgr, "menuButton",           menuBtn);
-        SetPrivateField(uiMgr, "legendText",           legendText);
+        SetPrivateField(uiMgr, "scoreText",           scoreText);
+        SetPrivateField(uiMgr, "timerText",           timerText);
+        SetPrivateField(uiMgr, "highScoreText",       highScoreText);
+        SetPrivateField(uiMgr, "collectionPopupText", popupText);
+        SetPrivateField(uiMgr, "gameOverPanel",       goPanel);
+        SetPrivateField(uiMgr, "finalScoreText",      goScore);
+        SetPrivateField(uiMgr, "finalHighScoreText",  goHighScore);
+        SetPrivateField(uiMgr, "restartButton",       btn);
+        SetPrivateField(uiMgr, "menuButton",          menuBtn);
+        SetPrivateField(uiMgr, "legendText",          legendText);
+        
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private TMP_Text CreateTMPText(GameObject parent, string name,
-                                    Vector2 anchoredPos, Vector2 sizeDelta,
-                                    TextAnchor anchor, float fontSize,
-                                    Color color, string text)
+    private Button CreateButton(GameObject parent, string name,
+        Vector2 anchoredPos, Vector2 size, Color color, string label, float fontSize)
     {
         GameObject obj = new GameObject(name);
         obj.transform.SetParent(parent.transform, false);
+        RectTransform rt = obj.AddComponent<RectTransform>();
+        rt.anchorMin        = new Vector2(0.5f, 0.5f);
+        rt.anchorMax        = new Vector2(0.5f, 0.5f);
+        rt.pivot            = new Vector2(0.5f, 0.5f);
+        rt.anchoredPosition = anchoredPos;
+        rt.sizeDelta        = size;
+        Image img = obj.AddComponent<Image>();
+        img.color = color;
+        Button btn = obj.AddComponent<Button>();
+        TMP_Text lbl = CreateTMPText(obj, "Label", Vector2.zero, size,
+            TextAnchor.MiddleCenter, fontSize, Color.white, label);
+        lbl.fontStyle = FontStyles.Bold;
+        lbl.rectTransform.anchorMin = Vector2.zero;
+        lbl.rectTransform.anchorMax = Vector2.one;
+        lbl.rectTransform.offsetMin = Vector2.zero;
+        lbl.rectTransform.offsetMax = Vector2.zero;
+        return btn;
+    }
 
+    private TMP_Text CreateTMPText(GameObject parent, string name,
+        Vector2 anchoredPos, Vector2 sizeDelta, TextAnchor anchor,
+        float fontSize, Color color, string text)
+    {
+        GameObject obj = new GameObject(name);
+        obj.transform.SetParent(parent.transform, false);
         RectTransform rt = obj.AddComponent<RectTransform>();
         rt.anchoredPosition = anchoredPos;
         rt.sizeDelta        = sizeDelta;
-
         TMP_Text tmp = obj.AddComponent<TextMeshProUGUI>();
         tmp.text      = text;
         tmp.fontSize  = fontSize;
         tmp.color     = color;
         tmp.alignment = ConvertAnchor(anchor);
-
         return tmp;
     }
 

@@ -20,6 +20,8 @@ public class MenuSceneBuilder : MonoBehaviour
     private static readonly Color ColorGold        = new Color(1f,    0.82f, 0.2f);
     private static readonly Color ColorGray        = new Color(0.6f,  0.65f, 0.62f);
     private static readonly Color ColorRed         = new Color(0.9f,  0.25f, 0.25f);
+    [SerializeField] private Shader litShader;  // Assign "Universal Render Pipeline/Lit" in Inspector
+
 
     private bool isTransitioning = false;
     private CanvasGroup canvasGroup;   // cached in BuildUI
@@ -35,14 +37,15 @@ public class MenuSceneBuilder : MonoBehaviour
     // ── Camera ────────────────────────────────────────────────────────────────
 
     private void BuildCamera()
-    {
-        Camera cam = Camera.main;
-        cam.backgroundColor = ColorBG;
-        cam.clearFlags      = CameraClearFlags.SolidColor;
-        cam.transform.position = new Vector3(0, 6f, -4f);
-        cam.transform.rotation = Quaternion.Euler(35f, 0, 0);
-        cam.fieldOfView = 60f;
-    }
+{
+    Camera cam = Camera.main;
+    if (cam == null) return; // ← tambah ini
+    cam.backgroundColor = ColorBG;
+    cam.clearFlags      = CameraClearFlags.SolidColor;
+    cam.transform.position = new Vector3(0, 6f, -4f);
+    cam.transform.rotation = Quaternion.Euler(35f, 0, 0);
+    cam.fieldOfView = 60f;
+}
 
     // ── Background ────────────────────────────────────────────────────────────
 
@@ -205,9 +208,9 @@ public class MenuSceneBuilder : MonoBehaviour
             ColorAccent, ColorAccentDark,
             "▶   PLAY", 52, Color.white);
         playBtn.GetComponent<Button>().onClick.AddListener(() =>
-        {
-            if (!isTransitioning) StartCoroutine(LoadGameScene());
-        });
+{
+    UnityEngine.SceneManagement.SceneManager.LoadScene(1);
+});
 
         // ── Footer: hint + timer badge ────────────────────────────────────────
         TMP_Text hint = MakeAnchoredText(card, "Hint",
@@ -243,8 +246,7 @@ public class MenuSceneBuilder : MonoBehaviour
 
         // Add CanvasGroup to root canvas object and cache it for LoadGameScene
         canvasGroup       = canvasObj.AddComponent<CanvasGroup>();
-        canvasGroup.alpha = 0f;
-        StartCoroutine(FadeIn(canvasGroup, 0.5f));
+        canvasGroup.alpha = 1f;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -385,12 +387,22 @@ public class MenuSceneBuilder : MonoBehaviour
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    private static Shader GetLitShader()
-    {
-        Shader s = Shader.Find("Universal Render Pipeline/Lit");
-        if (s != null) return s;
-        s = Shader.Find("Standard");
-        if (s != null) return s;
-        return Shader.Find("Sprites/Default");
-    }
+    private Shader GetLitShader()
+{
+    if (litShader != null) return litShader;
+    
+    // Fallback chain with better error handling
+    Shader s = Shader.Find("Universal Render Pipeline/Lit");
+    if (s != null && s.isSupported) return s;
+    
+    s = Shader.Find("Standard");
+    if (s != null && s.isSupported) return s;
+    
+    // Ultimate fallback - built-in unlit
+    s = Shader.Find("Unlit/Color");
+    if (s != null) return s;
+    
+    return Shader.Find("Sprites/Default");
+}
+
 }

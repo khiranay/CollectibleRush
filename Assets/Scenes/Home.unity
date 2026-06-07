@@ -455,6 +455,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b5a9b57632c326240a9602cef78c5860, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuSceneBuilder
+  litShader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
 --- !u!4 &1959177103
 Transform:
   m_ObjectHideFlags: 0
