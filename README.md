@@ -1,100 +1,81 @@
-# 🎮 Top-Down Collector — FXMedia Technical Test
+# 🎮 Collectible Rush — Unity Casual Game
 
-A simple Android top-down collecting game built with **Unity 6.4.x LTS** using **only primitive shapes** (no external assets).
+> A top-down collectible game built with Unity as part of the Unity Game Dev Internship Technical Test.
 
 ---
 
-## 📋 Requirements Checklist
+## 📖 About the Game
 
-### Core (Must Have)
-| # | Requirement | Status |
-|---|-------------|--------|
-| 1 | Player moves by tapping ground | ✅ |
-| 2 | Top-down camera follows player | ✅ |
-| 3 | At least 5 collectible items | ✅ (10 total) |
-| 4 | Player collects items by touching them | ✅ |
-| 5 | Score increases on collection | ✅ |
-| 6 | Collected items disappear | ✅ |
-| 7 | Score displayed on screen (UI Text) | ✅ |
-| 8 | At least 1 obstacle blocking movement | ✅ (8 obstacles) |
-| 9 | Builds to Android APK | ✅ |
+**Collectible Rush** is a top-down casual game where the player moves around an arena collecting items before the timer runs out. Different item types give different point values:
 
-### Bonus (Nice to Have)
-| # | Requirement | Status |
-|---|-------------|--------|
-| 1 | Sound effect on collection | ✅ (runtime AudioSource) |
-| 2 | 60-second timer + game over screen | ✅ |
-| 3 | Different item types (different point values) | ✅ (+1 / +3 / +5) |
-| 4 | Particle effect on collection | ✅ (runtime ParticleSystem) |
-| 5 | High score saved (PlayerPrefs) | ✅ |
+| Item | Shape | Points |
+|------|-------|--------|
+| 🟡 Common | Yellow Sphere | +1 |
+| 🔵 Rare | Blue Cube | +3 |
+| 🔴 Epic | Red Gem | +5 |
+
+- Click / tap to move the player
+- Collect as many items as possible within 60 seconds
+- High score is saved automatically
 
 ---
 
 ## 🛠️ How to Open the Project
 
-1. Install **Unity Hub** from [unity.com](https://unity.com/download)
-2. Install **Unity 6.4.x LTS** via Unity Hub
-   - Make sure to include **Android Build Support** + **Android SDK & NDK Tools**
-3. Clone this repository:
-   ```bash
-   git clone https://github.com/<your-username>/topdown-collector.git
+### Requirements
+- **Unity 6** (6000.x) or **Unity 2022 LTS**
+- **Android Build Support** module installed (via Unity Hub)
+- **TextMeshPro** package (auto-imported by Unity)
+
+### Steps
+1. Clone or download this repository:
    ```
-4. In Unity Hub → **Open** → select the project folder
-5. Allow Unity to import and compile (first time may take 2–3 minutes)
-6. Open **Assets/Scenes/MainScene.unity**
-7. Press **Play** to test in the editor
+   git clone https://github.com/khiranay/CollectibleRush.git
+   ```
+2. Open **Unity Hub** → click **Open** → select the project folder
+3. Wait for Unity to import all assets
+4. If prompted, click **Import TMP Essentials**
+5. Open scene: `Assets/Scenes/MenuScene` or `GameScene`
 
 ---
 
-## 📱 How to Build the APK
+## 📱 How to Build APK
 
-### Prerequisites
-- Unity 6.4.x LTS with Android Build Support
-- Android SDK / NDK (installed via Unity Hub)
-- Java JDK (bundled with Unity)
-
-### Build Steps
-
-1. Open **File → Build Settings**
-2. Select **Android** platform → click **Switch Platform**
-3. Click **Player Settings** and configure:
-   - **Company Name**: naiya
-   - **Product Name**: TopDownCollector Game
-   - **Package Name**: `com.yourname.topdowncollector`
-   - **Minimum API Level**: Android 7.0 (API 24) or higher
-   - **Target API Level**: Automatic (highest installed)
+1. Go to **File → Build Settings**
+2. Select **Android** → click **Switch Platform**
+3. Make sure both scenes are added in **Scenes In Build**:
+   - Index 0: `MenuScene`
+   - Index 1: `GameScene`
+4. Click **Player Settings** and configure:
+   - **Company Name**: your name
+   - **Product Name**: Collectible Rush
+   - **Minimum API Level**: Android 7.0 (API 24)
    - **Scripting Backend**: IL2CPP
-   - **Target Architecture**: ARM64 ✅, ARMv7 ✅
-4. Back in Build Settings → **Build**
-5. Choose output folder → Unity builds `TopDownCollector.apk`
+   - **Target Architecture**: ARM64
+5. Click **Build** → choose output folder → save as `CollectibleRush.apk`
 
-### Install on Device
-```bash
-# Enable USB debugging on your Android phone first
-adb install TopDownCollector.apk
-```
-Or transfer the APK to your phone and install directly (allow "Unknown Sources").
+> 💡 Make sure Android SDK & NDK are installed via Unity Hub → Installs → Add Modules
 
 ---
 
-## 🎮 How to Play / Test
+## 🧪 How to Test
 
-### Controls
-- **Tap anywhere on the ground** → player walks to that position
-- Collect glowing items to earn points
-- Avoid obstacles (brown boxes) — they block your path
+### In Unity Editor (PC)
+1. Open `GameScene`
+2. Press **Play** (▶)
+3. **Click anywhere** on the arena floor to move the player
+4. Collect items before the timer hits 0
 
-### Item Types
-| Visual | Type | Points |
-|--------|------|--------|
-| 🟡 Yellow Sphere | Common | +1 |
-| 🔵 Blue Cube | Rare | +3 |
-| 🔴 Red Gem | Epic | +5 |
+### On Android Device
+1. Enable **Developer Options** on your Android device
+2. Enable **USB Debugging**
+3. Connect device via USB
+4. In Unity: **File → Build Settings → Run Device** → select your device → **Build and Run**
 
-### Goal
-- Collect as many items as possible before the **60-second timer** runs out
-- Your **best score is saved** automatically
-- Tap **PLAY AGAIN** on the game over screen to restart
+### APK Install
+1. Transfer `CollectibleRush.apk` to your Android device
+2. Open the file → tap **Install**
+3. Allow installation from unknown sources if prompted
 
 ---
 
@@ -103,46 +84,41 @@ Or transfer the APK to your phone and install directly (allow "Unknown Sources")
 ```
 Assets/
 ├── Scenes/
-│   └── MainScene.unity        ← Only scene needed
+│   ├── MenuScene.unity
+│   └── GameScene.unity
 ├── Scripts/
-│   ├── SceneBuilder.cs        ← Builds entire scene at runtime
-│   ├── PlayerController.cs    ← Tap-to-move with Rigidbody
-│   ├── Collectible.cs         ← Item types, particles, collection logic
-│   ├── GameManager.cs         ← Score, timer, high score, game state
-│   ├── UIManager.cs           ← HUD, popups, game over screen
-│   └── CameraFollow.cs        ← Smooth top-down camera
+│   ├── GameManager.cs
+│   ├── PlayerController.cs
+│   ├── Collectible.cs
+│   ├── ItemSpawner.cs
+│   ├── UIManager.cs
+│   ├── CameraFollow.cs
+│   ├── DecoAnimator.cs
+│   ├── AudioManager.cs
+│   ├── SceneBuilder.cs
+│   └── MenuSceneBuilder.cs
+└── Audio/
+    └── BGM
+    └── CollectSFX
+    └── GameOverSFX
 ```
 
-> 💡 **No external assets.** All materials, shapes, particles, and UI are created in code at runtime.
-
 ---
 
-## 🔧 Scene Setup (for fresh project)
+## 🎵 Features
 
-If you want to recreate the scene from scratch:
-
-1. Create a **new empty scene**
-2. Create an empty GameObject named `SceneBuilder`
-3. Attach `SceneBuilder.cs` to it
-4. Press Play — the script builds everything automatically
-
----
-
-## 📦 Technical Details
-
-- **Engine**: Unity 6.4.x LTS
-- **Language**: C#
-- **Platform**: Android (API 24+)
-- **Architecture**: ARM64 + ARMv7 (IL2CPP)
-- **Assets**: Primitive shapes only (Cube, Sphere, Capsule)
-- **UI**: TextMeshPro (included with Unity)
-- **Physics**: Rigidbody + Trigger Colliders
+- ✅ Click-to-move player controller
+- ✅ 3 collectible item types with weighted random spawning
+- ✅ 60-second countdown timer
+- ✅ Score system with persistent high score (PlayerPrefs)
+- ✅ Particle effects on item collection
+- ✅ Background music (looped)
+- ✅ Game Over screen with Play Again & Main Menu
+- ✅ Procedurally built scene (no manual prefab setup needed)
 
 ---
 
 ## 👤 Author
 
 **Fakhirah Inayah**  
-Unity Developer Intern Candidate  
-Technical Test Submission — FXMedia
-
+Unity Game Dev Internship — Technical Test
